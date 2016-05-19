@@ -1,0 +1,75 @@
+#!/usr/bin/python
+
+import numpy
+import PIL.Image
+import sys
+import pyglet
+import pyglet.image
+import pyglet.clock
+import re
+
+black = numpy.array((False,False,False))
+red = numpy.array((True, False, False))
+green = numpy.array((False, True, False))
+blue = numpy.array((False, False, True))
+white = numpy.array((True,True,True))
+
+def left(a): return numpy.roll(a, 1, axis=1)
+def right(a): return numpy.roll(a,-1, axis=1)
+def up(a): return numpy.roll(a, -1, axis=0)
+def down(a): return numpy.roll(a, 1, axis=0)
+def anywhere(a): return left(a) | right(a) | up(a) | down(a)
+
+def parse(command):
+    
+    condition,operator,assigned=re.split("([+=-])",command,maxsplit=1)
+    
+    dirs={"^": "up", "v": "down", ">": "right", "<": "left", "*": "anywhere"}
+    colors={"r": "red", "g": "green", "b": "blue", "k": "black", "w": "white"}
+    s1=re.sub(r"([\^\*\<\>v])([rgbkw])", "{\g<1>}(\g<2>)", condition).format(**dirs)
+    s1="next_grid["+s1+"]"
+    s2=re.sub(r"([rgbkw])","{\g<1>}",assigned).format(**colors)
+    if(operator != "="): operator=operator+"="
+    
+    return "".join([s1,operator,s2])
+
+def load_orders(filename):
+
+    orders=""
+    f=open(filename,"r")
+    for command in f:
+        orders += parse(command)
+
+    return orders
+
+def step(past_grid):
+    
+    k=numpy.all(past_grid == False, axis=2)
+    w=numpy.all(past_grid == True, axis=2)
+    r=past_grid[:,:,0]
+    g=past_grid[:,:,1]
+    b=past_grid[:,:,2]
+
+    next_grid = past_grid.copy()
+    exec(orders)        
+    past_grid = next_grid.copy()
+    
+    return next_grid
+
+grid=numpy.random.rand(400,400,3) > 0.8
+
+def update(dt):
+    global grid
+    grid = step(grid)
+    grid8 = numpy.uint8(grid*255)
+    im = pyglet.image.ImageData(400,400,"RGB",bytes(grid8.data), -400*3)
+    im.blit(0,0,0)
+
+def go():
+    window = pyglet.window.Window(400,400)
+    pyglet.clock.schedule_interval(update,1/60)
+    pyglet.app.run()
+
+if __name__ == "__main__":
+    orders = load_orders(sys.argv[1])
+    go()
