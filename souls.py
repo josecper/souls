@@ -15,6 +15,7 @@ import sys
 import pyglet
 import pyglet.image
 import pyglet.clock
+import pyglet.gl
 import re
 
 black = numpy.array((False,False,False))
@@ -23,19 +24,34 @@ green = numpy.array((False, True, False))
 blue = numpy.array((False, False, True))
 white = numpy.array((True,True,True))
 
+fps=30
+
+try:
+    i=sys.argv.index("--fps")
+    fps=int(sys.argv[i+1])
+except ValueError:
+    pass
+
+density=0.2
+
 def left(a): return numpy.roll(a, 1, axis=1)
 def right(a): return numpy.roll(a,-1, axis=1)
 def up(a): return numpy.roll(a, -1, axis=0)
 def down(a): return numpy.roll(a, 1, axis=0)
 def anywhere(a): return left(a) | right(a) | up(a) | down(a)
+def everywhere(a): return left(a) & right(a) & up(a) & down(a)
+def number(a,n):
+    b = numpy.uint8(a)
+    return up(b)+down(b)+left(b)+right(b) == n
 
 def parse(command):
     
     condition,operator,assigned=re.split("([+=-])",command,maxsplit=1)
     
-    dirs={"^": "up", "v": "down", ">": "right", "<": "left", "*": "anywhere"}
+    dirs={"^": "up", "v": "down", ">": "right", "<": "left", "*": "anywhere", "!": "everywhere"}
     colors={"r": "red", "g": "green", "b": "blue", "k": "black", "w": "white"}
     s1=re.sub(r"([\^\*\<\>v])([rgbkw])", "{\g<1>}(\g<2>)", condition).format(**dirs)
+    s1=re.sub(r"([1-4])([rgbkw])","number(\g<2>,\g<1>)", s1)
     s1="next_grid["+s1+"]"
     s2=re.sub(r"([rgbkw])","{\g<1>}",assigned).format(**colors)
     if(operator != "="): operator=operator+"="
@@ -65,7 +81,7 @@ def step(past_grid):
     
     return next_grid
 
-grid=numpy.random.rand(400,400,3) > 0.8
+grid=numpy.random.rand(400,400,3) > (1-density)
 
 def update(dt):
     global grid
@@ -76,7 +92,7 @@ def update(dt):
 
 def go():
     window = pyglet.window.Window(400,400)
-    pyglet.clock.schedule_interval(update,1/30)
+    pyglet.clock.schedule_interval(update,1/fps)
     pyglet.app.run()
 
 if __name__ == "__main__":
